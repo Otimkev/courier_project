@@ -30,23 +30,52 @@ export const signup = async(req, res)=>{
     const {email, password, confirmPassword, firstName, lastName} = req.body
 
     try{
-        const existingUser = User.findOne({email});
+        const existingUser = await User.findOne({email});
         
-        if(existingUser) return res.status(404).json({message: "user already exists"});
+        if(existingUser){
+            return res.status(404).json({message: "user already exists"})
+        };
         
-        if(!password===confirmPassword) return res.status(400).json({message: "passwords don't match"});
+        if(!password===confirmPassword) {
+            return res.status(400).json({message: "passwords don't match"})
+        };
         
-        const hashedPassword = await bcrypt.hash(password, 12);
+        const hashedPassword = await encrypt_password(password);
         
-        const newUser = await User.create({email, password: hashedPassword, name: `${firstName}, ${lastName}`});
-        
-        const token = jwt.sign({email: newUser.email, id: newUser._id}, 'test', {expiresIn: "1h"})
+        const newUser = await User.create({email, password: hashedPassword, name:`${firstName} ${lastName}`});
+        if(newUser) {
+            const token = create_token(newUser)
+            const userData = {
+                id:newUser._id,
+                name:newUser.name,
+                email:newUser.email,
+                token:token,
+            }
+            res.status(200).json(userData);
+        }
 
-        res.status(200).json({newUser, token});
 
     }catch(error){
         res.status(500).json({message:'something went wrong'});
 
+    }
+}
+//This is a helper function that creates a token
+const create_token = ({email, password, _id}) => {
+    const token = jwt.sign({
+        email,
+        password,
+        id:_id
+    }, 'test', {expiresIn: '1h'})
+    return token;
+}
+//This is a helper function that encrypts/hashes the password
+const encrypt_password = async (password) =>{
+    try {
+        const result = await bcrypt.hash(password, 12);
+        return result;
+    } catch (error) {
+        console.log(error)
     }
 }
 
